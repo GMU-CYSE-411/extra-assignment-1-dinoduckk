@@ -1,24 +1,32 @@
+//simple HTML escape to prevent DOM XSS when rendering note content.
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// noteCard escapes all untrusted fields before inserting into HTML.
 function noteCard(note) {
   return `
     <article class="note-card">
-      <h3>${note.title}</h3>
-      <p class="note-meta">Owner: ${note.ownerUsername} | ID: ${note.id} | Pinned: ${note.pinned}</p>
-      <div class="note-body">${note.body}</div>
+      <h3>${escapeHtml(note.title)}</h3>
+      <p class="note-meta">Owner: ${escapeHtml(note.ownerUsername)} | ID: ${note.id} | Pinned: ${note.pinned}</p>
+      <div class="note-body">${escapeHtml(note.body)}</div>
     </article>
   `;
 }
 
-async function loadNotes(ownerId, search) {
+async function loadNotes(search) {
   const query = new URLSearchParams();
-
-  if (ownerId) {
-    query.set("ownerId", ownerId);
-  }
 
   if (search) {
     query.set("search", search);
   }
 
+  // no ownerId in query; server uses session user to enforce auth.
   const result = await api(`/api/notes?${query.toString()}`);
   const notesList = document.getElementById("notes-list");
   notesList.innerHTML = result.notes.map(noteCard).join("");
@@ -33,9 +41,8 @@ async function loadNotes(ownerId, search) {
       return;
     }
 
-    document.getElementById("notes-owner-id").value = user.id;
-    document.getElementById("create-owner-id").value = user.id;
-    await loadNotes(user.id, "");
+    // Owner ID is no longer needed in the UI; backend derives from session.
+    await loadNotes("");
   } catch (error) {
     document.getElementById("notes-list").textContent = error.message;
   }
@@ -45,7 +52,7 @@ document.getElementById("search-form").addEventListener("submit", async (event) 
   event.preventDefault();
 
   const formData = new FormData(event.currentTarget);
-  await loadNotes(formData.get("ownerId"), formData.get("search"));
+  await loadNotes(formData.get("search"));
 });
 
 document.getElementById("create-note-form").addEventListener("submit", async (event) => {
@@ -53,18 +60,17 @@ document.getElementById("create-note-form").addEventListener("submit", async (ev
 
   const formData = new FormData(event.currentTarget);
   const payload = {
-    ownerId: formData.get("ownerId"),
     title: formData.get("title"),
     body: formData.get("body"),
     pinned: formData.get("pinned") === "on"
   };
 
+  // do not send ownerId; backend uses authenticated user.
   await api("/api/notes", {
     method: "POST",
     body: JSON.stringify(payload)
   });
 
-  await loadNotes(payload.ownerId, "");
+  await loadNotes("");
   event.currentTarget.reset();
-  document.getElementById("create-owner-id").value = payload.ownerId;
 });

@@ -6,6 +6,7 @@ async function initializeDatabase() {
   const analysisDir = path.dirname(DEFAULT_DB_FILE);
   fs.mkdirSync(analysisDir, { recursive: true });
 
+  // for a clean DB each time; we delete the old file.
   if (fs.existsSync(DEFAULT_DB_FILE)) {
     fs.unlinkSync(DEFAULT_DB_FILE);
   }
@@ -22,11 +23,13 @@ async function initializeDatabase() {
     )
   `);
 
+  // sessions table now has csrf_token column for CSRF protection.
   await db.run(`
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL,
       created_at TEXT NOT NULL,
+      csrf_token TEXT NOT NULL,
       FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
@@ -53,6 +56,7 @@ async function initializeDatabase() {
     )
   `);
 
+  // Seed users (admin + two students).
   await db.run(
     "INSERT INTO users (username, password, role, display_name) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
     [
@@ -71,6 +75,7 @@ async function initializeDatabase() {
     ]
   );
 
+  // Seed settings.
   await db.run(
     "INSERT INTO settings (user_id, status_message, theme, email_opt_in) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)",
     [
@@ -89,6 +94,7 @@ async function initializeDatabase() {
     ]
   );
 
+  // Seed notes.
   await db.run(
     "INSERT INTO notes (owner_id, title, body, pinned, created_at) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)",
     [
